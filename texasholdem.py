@@ -253,8 +253,9 @@ class Deck:
 	def score_all(self):
 		scores = {}
 		n_hands = fac(self.N)/(fac(self.pocket_n)*fac(self.N-self.pocket_n))
+		start_time = time.time()
 		for i,cards in enumerate(combinations(self.cards,self.pocket_n)):
-			print('%i/%i %s\t' %(i,n_hands,cards))
+			print('%i/%i %s %s\t' %(i,n_hands,cards,time.time()-start_time))
 			s_cards = set(cards)
 			scores[cards] = {}
 			for tc_n in range(self.table_card_n+1):
