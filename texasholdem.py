@@ -11,20 +11,26 @@ class Suit:
 		self.name = name
 		self.display = None
 
+
 	def __repr__(self):
 		return self.name
+
 
 	def __str__(self):
 		return self.name
 
+
 	def __eq__(self,other):
 		return self.name == other.name
+
 
 	def __lt__(self,other):
 		return self.name < other.name #Doesn't make sense but this should be alphabetical because we have to have consistent ordering
 
+
 	def __hash__(self):
 		return hash(self.name)
+
 
 	def draw(self,canvas,x0,x1,y0,y1):
 		if name == 'Hearts':
@@ -49,25 +55,29 @@ class Name:
 	name_dict = {'Ace':14,'King':13,'Queen':12,'Jack':11}
 
 	def __init__(self,name):
-		self.name = name
+		self.name = str(name)
 		self.number = self.name_dict[name] if name in self.name_dict else int(name)
 		self.display = None
+
 
 	def __repr__(self):
 		return self.name
 
+
 	def __str__(self):
 		return self.__repr__()
+
 
 	def __eq__(self,other):
 		return self.number == other.number
 
+
 	def __lt__(self,other):
 		return self.number < other.number
 
+
 	def __hash__(self):
 		return hash(self.__repr__())
-
 
 
 class Card:
@@ -77,14 +87,18 @@ class Card:
 		self.suit = Suit(suit)
 		self.display = None
 
+
 	def __repr__(self):
 		return '%s of %s' %(self.name,self.suit)
+
 
 	def __str__(self):
 		return self.__repr__()
 
+
 	def __eq__(self,other):
 		return self.name == other.name and self.suit == other.suit
+
 
 	def __lt__(self,other):
 		if self.name == other.name:
@@ -92,8 +106,10 @@ class Card:
 		else:
 			return self.name < other.name
 
+
 	def __hash__(self):
 		return hash(self.__repr__())
+
 
 	def draw(self,canvas,x0,x1,y0,y1):
 		self.display = c
@@ -117,18 +133,20 @@ class Hand:
 				self.numbers[card.name.number] = 1
 		self.score = self._score()
 
+
 	def __repr__(self):
 		return (', '.join([card.__repr__() 
 				for card in self.cards]))
 
+
 	def __str__(self):
 		return self.__repr__()
 
+
 	def __eq__(self,other):
-		for s0,s1 in zip(self.score,other.score):
-			if s0 != s1:
-				return False
-		return True
+		return all([this_card == other_card for this_card,other_card in
+					zip(self.cards,other.cards)])
+
 
 	def __lt__(self,other):
 		for s0,s1 in zip(self.score[::-1],other.score[::-1]):
@@ -138,18 +156,22 @@ class Hand:
 				return s0 < s1
 		return False
 
+
 	def __hash__(self):
 		return hash(self.__repr__())
 
+	
 	def _score(self):
 		return (self.high_card(),self.pair(),self.two_pair(),
 			    self.three(),self.straight(),self.flush(),
 			    self.full_house(),self.four(),
 			    self.straight()*self.flush())
 
+
 	def flush(self):
 		return (max(self.numbers.keys()) if 
 				max(self.suits.values()) == Deck.hand_n else 0)
+
 
 	def straight(self):
 		return (self.cards[0].name.number if 
@@ -160,15 +182,18 @@ class Hand:
 		return (max(self.numbers,key=self.numbers.get)
 				if max(self.numbers.values()) == 4 else 0)
 
+
 	def full_house(self):
 		return (Deck.n_names*max(self.numbers,key=self.numbers.get) +
 				min(self.numbers,key=self.numbers.get)
 				if max(self.numbers.values()) == 3 and 
 			    min(self.numbers.values()) == 2 else 0)
 
+
 	def three(self):
 		return (max(self.numbers,key=self.numbers.get)
 			    if max(self.numbers.values()) == 3 else 0)
+
 
 	def two_pair(self):
 		one_pair = 0
@@ -183,11 +208,13 @@ class Hand:
 					one_pair = k
 		return 0
 
+
 	def pair(self):
 		for k,v in self.numbers.items():
 			if v == 2:
 				return k
 		return 0
+
 
 	def high_card(self):
 		return sum([(Deck.n_names**(Deck.hand_n-i))*card.name.number for 
@@ -201,114 +228,94 @@ class Deck:
 	n_names = 13
 	N = 52
 	hand_n = 5
-	table_card_n = 5
-	pocket_n = 2
-	max_player_calc = 10
 
-	def __init__(self,seed=11):
+	def __init__(self,deal_n=2,table_card_n=[0,3,4,5],max_player_calc=10,seed=11):
 		np.random.seed(seed)
+		self.deal_n = deal_n
+		self.table_card_n = table_card_n
+		self.max_player_calc = max_player_calc
 		self.cards = set([Card(name,suit) for suit in self.suits
 					  	  for name in self.names])
-		if not op.isfile('hand_records.npz'):
-			print('Calculating all hands and saving relative records, ' +
-				  'this may take several minutes...')
-			self.save_all_hands_records()
-		print('Loading in hand records')
-		f = np.load('hand_records.npz')
-		self.hand_records = f['hand_records'].item()
-		self.ranked_hands = f['ranked_hands']
+	
+		# CALCULATE 3-5 in real time, 0 saved out
 		if not op.isfile('holdem.npz'):
-			print('Calculating probability for every situation in ' +
-				  'Texas Hold \'em, this may take several hours...')
-			self.score_all()
+			print('Calculating probability for every set of cards in ' +
+				  'Texas Hold \'em, this may take several minutes...')
+			#self.save_score_holdem()
 		print('Loading in scores')
-		self.scores = np.load('holdem.npz')['scores']
-
-	def random_hand(self):
-		return Hand(np.random.choice(self.cards,size=self.hand_n,replace=False))
-
-	def all_hands(self):
-		return [Hand(c) for c in combinations(self.cards,self.hand_n)]
-
-	def save_all_hands_records(self):
-		print('Getting all combinations of hands')
-		all_hands = self.all_hands()
-		total_n = len(all_hands)
-		print('Ranking scores')
-		ranked_hands = sorted(all_hands)
-		print('Finding win loss draw records')
-		j = 0
-		hand_records = {}
-		for i in tqdm(range(1,total_n+1)):
-			if i == total_n or ranked_hands[i] != ranked_hands[i-1]:
-				same = (i-j)
-				for hand in ranked_hands[j:i]:
-					hand_records[hand] = ((0,j),(i,total_n),(j,i)) #wins,losses,draws
-				j = i
-		print('Saving for next time')
-		np.savez_compressed('hand_records.npz',hand_records=hand_records,
-							ranked_hands=ranked_hands)
+		#f = np.load('holdem.npz')
+		#self.holdem = f['holdem_data'].item()
+		self.card_combos = list(combinations(self.cards,self.deal_n))
 
 
-	def score_all(self):
-		scores = {}
-		n_hands = fac(self.N)/(fac(self.pocket_n)*fac(self.N-self.pocket_n))
-		start_time = time.time()
-		for i,cards in enumerate(combinations(self.cards,self.pocket_n)):
-			print('%i/%i %s %s\t' %(i,n_hands,cards,time.time()-start_time))
-			s_cards = set(cards)
-			scores[cards] = {}
-			for tc_n in range(self.table_card_n+1):
-				for down_table_cards in combinations(
-						self.cards.difference(cards),tc_n):
-					s_down_table_cards = set(down_table_cards)
-					scores[cards][down_table_cards] = \
-								self.get_win_loss_draw_prob(s_cards,
-									s_down_table_cards)
-		np.savez_compressed('holdem.npz',scores=scores)
-		
+	def random_deal(self):
+		return self.card_combos[np.random.randint(len(self.card_combos))]
 
-	def get_win_loss_draw_prob(self,cards,down_table_cards):
+
+	def random_table_cards(self,deal,n=None):
+		if n is None:
+			n = int(np.random.choice(self.table_card_n))
+		this_cards = self.cards.difference(set(deal))
+		this_cards_len = len(this_cards)
+		n_combos = int(fac(this_cards_len)/(fac(n)*fac(this_cards_len-n)))
+		index = np.random.randint(n_combos)
+		for i,v in enumerate(combinations(this_cards,n)):
+			if i == index:
+				return v
+		return
+
+
+	def save_score_holdem(self):
+		holdem_data = np.zeros((len(self.card_combos),
+                 			    self.max_player_calc,3)) #win, loss, draw
+		for i,deal in enumerate(card_combos):
+			wins,losses,draws = self._score_holdem(deal,tcs,card_combos)
+			total = wins + losses + draws
+			for n in range(1,self.max_player_calc+1):
+				holdem_data[i,n-1] += self._adjust_wins_losses_draws(wins,losses,draws,n)
+		np.savez_compressed('holdem.npz',holdem_data=holdem_data)
+
+
+	def _score_holdem(self,deal,tcs):
+		this_cards = self.cards.difference(tcs).difference(deal)
 		wins = losses = draws = 0
-		for possible_table_cards in combinations(self.cards.difference(
-												 cards.union(down_table_cards)),
-												 self.table_card_n-len(down_table_cards)):
-			possible_table_cards = set(possible_table_cards)
-			this_hand = self.get_best_hand(cards,down_table_cards.union(possible_table_cards))
-			worse,better,same = (self.ranked_hands[i:j] for (i,j) in self.hand_records[this_hand])
-			table_cards = cards.union(down_table_cards).union(possible_table_cards)
-			for counter,hands in zip((wins,losses,draws),(worse,better,same)):
-				self.remove_impossible(hands,table_cards)
-				counter += len(hands)
-		win_loss_draw_prob = {}
+		next_card_n = self.hand_n-len(tcs)
+		holdem_card_combos_n = fac(self.N)/(fac(next_card_n)*fac(self.N-next_card_n))
+		status_n = max([1,int(holdem_card_combos_n/100)])
+		for j,next_tcs in enumerate(combinations(this_cards,self.hand_n-len(tcs))):
+			if j % status_n == 0:
+				print('%i percent done' %(j/status_n))
+			this_hand = self.get_best_hand(deal+tcs+next_tcs)
+			for other_deal in combinations(this_cards.difference(next_tcs),self.deal_n):
+				other_hand = self.get_best_hand(other_deal+tcs+next_tcs)
+				if this_hand > other_hand:
+					wins += 1
+				elif this_hand < other_hand:
+					print(other_deal)
+					losses += 1
+				else:
+					draws += 1
+		return wins,losses,draws
+
+
+	def _adjust_wins_losses_draws(self,wins,losses,draws,n):
 		total = wins + losses + draws
-		for j,n_other_players in enumerate(range(1,self.max_player_calc+1)):
-			draw_perc = 1 - (1-draws/total)**n_other_players
-			loss_perc = 1 - (1-losses/total)**n_other_players #estimate: every player has roughly one shot to get a better hand
-			win_perc = 1 - draw_perc - loss_perc
-			win_loss_draw_prob[n_other_players] = (win_perc,draw_perc,loss_perc)
-		
-	def remove_impossible(self,hands,table_cards):
-		remove_indices = []
-		for i,hand in enumerate(hands):
-			if any([card in table_cards for card in hand.cards]):
-				remove_indices.append(i)
-		hands = np.delete(hands,remove_indices)
+		adjusted_losses = 1-(1-losses/total)**n
+		adjusted_draws = (1-(1-draws/total)**n) * (1-(adjusted_losses-losses/total))**n
+		return 1-adjusted_losses-adjusted_draws, adjusted_draws, adjusted_losses
 
-	def n_mutually_exclusive(self,hands,n_other_players):
-		if n_other_players == 1: # save some unnecessary computation
-			return len(hands)
-		n = 0
-		for these_hands in combinations(hands,n_other_players):
-			these_hands = set(these_hands)
-			if not any([card in these_hands.difference(set([hand]))
-					    for card in hand.cards for hand in these_hands]):
-				n += 1
-		return n
 
-	def get_best_hand(self,cards,table_cards):
-		return max([Hand(c) for c in combinations(cards.union(table_cards),
-												  self.hand_n)])
+	def score_holdem(self,deal,table_cards,n_other_players):
+		if table_cards:
+			wins,losses,draws = self._score_holdem(deal,table_cards)
+			return self._adjust_wins_losses_draws(wins,losses,draws,n_other_players)
+		else:
+			index = self.card_combos.index(deal)
+			return self.holdem[index,n_other_players-1]
+
+
+	def get_best_hand(self,cards):
+		return max([Hand(c) for c in combinations(cards,self.hand_n)])
 
 
 class PokerGUI(Frame):
@@ -325,6 +332,7 @@ class PokerGUI(Frame):
 		self.canvas.pack(fill='both', expand=True)
 		self.font = ('Helvetica',int(self.size*10/1080))
 		self.data = {}
+
 
 	def getFrame(self,x0,x1,y0,y1):
 		frame = Frame(self.root,
@@ -365,9 +373,12 @@ def fac(x):
 
 if __name__ == '__main__':
 	d = Deck()
+	'''from texasholdem import *
+	self = Deck()
+	deal = self.random_deal()
+	tcs = self.random_table_cards(deal)
+	self.score_holdem(deal,tcs,1)'''
 	#root = Tk()
 	#PokerGUI(root)
 	#root.mainloop()
 
-
-		
