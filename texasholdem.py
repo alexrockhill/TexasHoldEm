@@ -238,14 +238,14 @@ class Deck:
 					  	  for name in self.names])
 	
 		# CALCULATE 3-5 in real time, 0 saved out
+		self.card_combos = list(combinations(self.cards,self.deal_n))
 		if not op.isfile('holdem.npz'):
 			print('Calculating probability for every set of cards in ' +
-				  'Texas Hold \'em, this may take several minutes...')
+				  'Texas Hold \'em, this may take several days...')
 			self.save_score_holdem()
 		print('Loading in scores')
 		f = np.load('holdem.npz')
 		self.holdem = f['holdem_data'].item()
-		self.card_combos = list(combinations(self.cards,self.deal_n))
 
 
 	def random_deal(self):
@@ -268,8 +268,8 @@ class Deck:
 	def save_score_holdem(self):
 		holdem_data = np.zeros((len(self.card_combos),
                  			    self.max_player_calc,3)) #win, loss, draw
-		for i,deal in enumerate(card_combos):
-			wins,losses,draws = self._score_holdem(deal,tcs,card_combos)
+		for i,deal in enumerate(self.card_combos):
+			wins,losses,draws = self._score_holdem(deal,tuple())
 			total = wins + losses + draws
 			for n in range(1,self.max_player_calc+1):
 				holdem_data[i,n-1] += self._adjust_wins_losses_draws(wins,losses,draws,n)
@@ -291,7 +291,6 @@ class Deck:
 				if this_hand > other_hand:
 					wins += 1
 				elif this_hand < other_hand:
-					print(other_deal)
 					losses += 1
 				else:
 					draws += 1
