@@ -241,10 +241,10 @@ class Deck:
 		if not op.isfile('holdem.npz'):
 			print('Calculating probability for every set of cards in ' +
 				  'Texas Hold \'em, this may take several minutes...')
-			#self.save_score_holdem()
+			self.save_score_holdem()
 		print('Loading in scores')
-		#f = np.load('holdem.npz')
-		#self.holdem = f['holdem_data'].item()
+		f = np.load('holdem.npz')
+		self.holdem = f['holdem_data'].item()
 		self.card_combos = list(combinations(self.cards,self.deal_n))
 
 
