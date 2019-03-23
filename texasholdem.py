@@ -228,24 +228,14 @@ class Deck:
 	n_names = 13
 	N = 52
 	hand_n = 5
+	deal_n = 2
 
-	def __init__(self,deal_n=2,table_card_n=[0,3,4,5],max_player_calc=10,seed=11):
+	def __init__(self,seed=11,mc_delta=0.001):
 		np.random.seed(seed)
-		self.deal_n = deal_n
-		self.table_card_n = table_card_n
-		self.max_player_calc = max_player_calc
+		self.mc_delta = mc_delta
 		self.cards = set([Card(name,suit) for suit in self.suits
 					  	  for name in self.names])
-	
-		# CALCULATE 3-5 in real time, 0 saved out
 		self.card_combos = list(combinations(self.cards,self.deal_n))
-		if not op.isfile('holdem.npz'):
-			print('Calculating probability for every set of cards in ' +
-				  'Texas Hold \'em, this may take several days...')
-			self.save_score_holdem()
-		print('Loading in scores')
-		f = np.load('holdem.npz')
-		self.holdem = f['holdem_data'].item()
 
 
 	def random_deal(self):
@@ -254,7 +244,7 @@ class Deck:
 
 	def random_table_cards(self,deal,n=None):
 		if n is None:
-			n = int(np.random.choice(self.table_card_n))
+			n = int(np.random.choice(self.hand_n))
 		this_cards = self.cards.difference(set(deal))
 		this_cards_len = len(this_cards)
 		n_combos = int(fac(this_cards_len)/(fac(n)*fac(this_cards_len-n)))
@@ -265,52 +255,35 @@ class Deck:
 		return
 
 
-	def save_score_holdem(self):
-		holdem_data = np.zeros((len(self.card_combos),
-                 			    self.max_player_calc,3)) #win, loss, draw
-		for i,deal in enumerate(self.card_combos):
-			wins,losses,draws = self._score_holdem(deal,tuple())
-			total = wins + losses + draws
-			for n in range(1,self.max_player_calc+1):
-				holdem_data[i,n-1] += self._adjust_wins_losses_draws(wins,losses,draws,n)
-		np.savez_compressed('holdem.npz',holdem_data=holdem_data)
+	def score_holdem(self,deal,table_cards=None,n_other_players=1):
+		if table_cards is None:
+			table_cards = tuple()
+		this_cards = list(self.cards.difference(deal).difference(set(table_cards)))
+		mc_delta = 1
+		result = np.array([0,0,0]) #wins, losses, draws
+		while mc_delta > self.mc_delta or not result.all():
+			this_result = self.mc(deal,table_cards,this_cards,n_other_players)
+			result,mc_delta = self.get_mc_delta(result,this_result)
+		return result/result.sum()
 
 
-	def _score_holdem(self,deal,tcs):
-		this_cards = self.cards.difference(tcs).difference(deal)
-		wins = losses = draws = 0
-		next_card_n = self.hand_n-len(tcs)
-		holdem_card_combos_n = fac(self.N)/(fac(next_card_n)*fac(self.N-next_card_n))
-		status_n = max([1,int(holdem_card_combos_n/100)])
-		for j,next_tcs in enumerate(combinations(this_cards,self.hand_n-len(tcs))):
-			if j % status_n == 0:
-				print('%i percent done' %(j/status_n))
-			this_hand = self.get_best_hand(deal+tcs+next_tcs)
-			for other_deal in combinations(this_cards.difference(next_tcs),self.deal_n):
-				other_hand = self.get_best_hand(other_deal+tcs+next_tcs)
-				if this_hand > other_hand:
-					wins += 1
-				elif this_hand < other_hand:
-					losses += 1
-				else:
-					draws += 1
-		return wins,losses,draws
+	def mc(self,deal,table_cards,cards,n):
+		other_cards = np.random.choice(cards,
+					   self.deal_n*n+self.hand_n-len(table_cards),
+					   replace=False)
+		other_deals = [other_cards[i:i+2] for i in range(n)]
+		next_table_cards = tuple(other_cards[n*2:])
+		other_hands = [self.get_best_hand(tuple(other_deal)+table_cards+next_table_cards)
+					   for other_deal in other_deals]
+		this_hand = self.get_best_hand(deal+table_cards+next_table_cards)
+		loss = any([other_hand>this_hand for other_hand in other_hands])
+		win = all([this_hand>other_hand for other_hand in other_hands])
+		return np.array([win,loss,(not win and not loss)])
 
 
-	def _adjust_wins_losses_draws(self,wins,losses,draws,n):
-		total = wins + losses + draws
-		adjusted_losses = 1-(1-losses/total)**n
-		adjusted_draws = (1-(1-draws/total)**n) * (1-(adjusted_losses-losses/total))**n
-		return 1-adjusted_losses-adjusted_draws, adjusted_draws, adjusted_losses
-
-
-	def score_holdem(self,deal,table_cards,n_other_players):
-		if table_cards:
-			wins,losses,draws = self._score_holdem(deal,table_cards)
-			return self._adjust_wins_losses_draws(wins,losses,draws,n_other_players)
-		else:
-			index = self.card_combos.index(deal)
-			return self.holdem[index,n_other_players-1]
+	def get_mc_delta(self,result,this_result):
+		new = np.add(result,this_result)
+		return new, 1 if not result.all() else sum(new/result-1)
 
 
 	def get_best_hand(self,cards):
@@ -372,11 +345,11 @@ def fac(x):
 
 if __name__ == '__main__':
 	d = Deck()
-	'''from texasholdem import *
-	self = Deck()
-	deal = self.random_deal()
-	tcs = self.random_table_cards(deal)
-	self.score_holdem(deal,tcs,1)'''
+'''from texasholdem import *
+self = Deck()
+deal = self.random_deal()
+tcs = self.random_table_cards(deal)
+self.score_holdem(deal,tcs,1)'''
 	#root = Tk()
 	#PokerGUI(root)
 	#root.mainloop()
