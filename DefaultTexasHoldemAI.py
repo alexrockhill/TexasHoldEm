@@ -43,13 +43,13 @@ class TexasHoldemAI:
         go_for_it = w > (self.check_threshold + this_bet/self.cashes[self.name]/10)
         if go_for_it or self.bluffing or big_stack:
             if self.big_bet:
-                amount = max([max(self.current_bets), cash / np.random.randint(4, 7)])
+                amount = int(max([this_bet, cash / np.random.randint(2, 7)]))
             elif self.bluffing:
-                amount = max([max(self.current_bets), cash / np.random.randint(4, 8)])
+                amount = int(max([this_bet, cash / np.random.randint(4, 8)]))
             elif big_stack:
-                amount = max([max(self.current_bets), cash / np.random.randint(15, 25)])
+                amount = int(max([this_bet, cash / np.random.randint(15, 25)]))
             else:
-                amount = max([max(self.current_bets), cash / np.random.randint(15, 25)])
+                amount = int(max([this_bet, cash / np.random.randint(15, 25)]))
             self.pot += amount
             self.cashes[self.name] -= amount
             self.data[self.hands][self.name][self.table_card_names[len(self.table_cards)]] = amount

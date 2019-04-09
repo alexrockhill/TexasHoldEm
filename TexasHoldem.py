@@ -439,7 +439,9 @@ class Game:
         else:
             winner_text = 'Everyone else folded, %s wins' % winner.name
         self.send_to_gui('hand_over', winner_text)
-        self.dealer += 1
+        self.dealer = (self.dealer + 1) % self.n_players
+        while not self.players[self.dealer].cash:
+            self.dealer = (self.dealer + 1) % self.n_players
         winner.cash += self.pot
         info = {'winner': {winner.name: winner.deal},
                 'losers': {player.name: player.deal for player in self.players if player is not winner},
