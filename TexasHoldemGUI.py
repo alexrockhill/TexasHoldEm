@@ -135,7 +135,8 @@ class TexasHoldemGUI(Frame):
         self.call_check_button.config(text=call_check_text)
         self.set_bet_entry()
         self.player_up()
-        time.sleep(0.5)
+        if not self.game.current_human == self.game.turn:
+            time.sleep(0.5)
 
     def update_fold(self):
         player = self.game.players[self.game.turn]
