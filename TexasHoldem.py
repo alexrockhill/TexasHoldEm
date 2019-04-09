@@ -167,7 +167,7 @@ class Hand:
                     i, card in enumerate(self.cards)])
 
     def number_to_name(self, number):
-        if number <= Deck.n_names:
+        if number <= Deck.n_names + 1:
             return self.number_dict[number] if number in self.number_dict else number
         else:
             name0 = self.number_to_name(number // Deck.n_names)
@@ -178,13 +178,13 @@ class Hand:
         straight, flush, four, three = self.straight(), self.flush(), self.four(), self.three()
         full_house = self.full_house()
         two_pair = self.two_pair()
-        pair, high_card = self.pair(), self.high_card()
+        pair = self.pair()
         if straight and flush:
             return '%s high straight flush' % self.number_to_name(straight)
         elif four:
             return 'Four %ss' % self.number_to_name(four)
         elif full_house:
-            return 'Full house %ss full of %ss'.format(self.number_to_name(full_house))
+            return 'Full house {}s full of {}s'.format(*self.number_to_name(full_house))
         elif flush:
             return 'Flush, %s high' % self.number_to_name(flush)
         elif straight:
@@ -192,11 +192,11 @@ class Hand:
         elif three:
             return 'Three %ss' % self.number_to_name(three)
         elif two_pair:
-            return 'Two pair %s' % self.number_to_name(two_pair)
+            return 'Two pair {}s and {}s'.format(*self.number_to_name(two_pair))
         elif pair:
             return 'Pair %s' % self.number_to_name(pair)
         else:
-            return 'High card %s' % self.number_to_name(high_card)
+            return 'High card %s' % self.number_to_name(max(self.numbers))
 
 
 class Deck:
