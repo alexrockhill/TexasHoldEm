@@ -15,7 +15,7 @@ class TexasHoldemAI:
         self.deal = self.pot = self.table_cards = None
         self.bluff_likelihood = np.random.random()
         self.big_bet_likelihood = np.random.random()
-        self.check_threshold = 0.75
+        self.check_threshold = 0.5
         self.big_bet = False
         self.bluffing = False
         self.current_bets = {}

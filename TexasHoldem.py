@@ -175,10 +175,9 @@ class Hand:
             return name0, name1
 
     def get_text(self):
-        straight, flush, four, three = self.straight(), self.flush(), self.four(), self.three()
+        straight, flush, four, three, pair = self.straight(), self.flush(), self.four(), self.three(), self.pair()
         full_house = self.full_house()
         two_pair = self.two_pair()
-        pair = self.pair()
         if straight and flush:
             return '%s high straight flush' % self.number_to_name(straight)
         elif four:
@@ -188,7 +187,7 @@ class Hand:
         elif flush:
             return 'Flush, %s high' % self.number_to_name(flush)
         elif straight:
-            return 'Straight %s' % self.number_to_name(straight)
+            return 'Straight %s high' % self.number_to_name(straight)
         elif three:
             return 'Three %ss' % self.number_to_name(three)
         elif two_pair:
@@ -306,6 +305,7 @@ class Game:
     def new_game(self):
         self.hands += 1
         self.pot = 0
+        self.turn = self.dealer
         self.table_cards = tuple()
         self.deck = Deck()
         for player in self.players:
@@ -322,10 +322,12 @@ class Game:
             self.get_ai_response()
 
     def blinds(self):
-        self.pot += self.players[(self.dealer + 1) % self.n_players].make_bet(self.small_blind)
-        self.pot += self.players[(self.dealer + 2) % self.n_players].make_bet(self.big_blind)
-        self.raise_player = (self.dealer + 2) % self.n_players
-        self.turn = (self.dealer + 3) % self.n_players
+        self.next_player()
+        self.pot += self.players[self.turn].make_bet(self.small_blind)
+        self.next_player()
+        self.pot += self.players[self.turn].make_bet(self.big_blind)
+        self.raise_player = self.turn
+        self.next_player()
         self.send_to_gui('update_turn')
         if self.hands % self.n_players == 0 and self.hands > 0:
             self.small_blind *= 2
@@ -391,9 +393,7 @@ class Game:
         player = self.players[self.turn]
         if self.raise_player is None and not player.has_folded and player.cash > 0:
             self.raise_player = self.turn
-        self.turn = (self.turn + 1) % self.n_players
-        while self.players[self.turn].has_folded or self.players[self.turn].cash == 0:
-            self.turn = (self.turn + 1) % self.n_players
+        self.next_player()
         winner = self.check_all_fold()
         if winner is None:
             if self.check_all_call():
@@ -403,6 +403,11 @@ class Game:
                 self.get_ai_response()
         else:
             self.hand_over(winner)
+
+    def next_player(self):
+        self.turn = (self.turn + 1) % self.n_players
+        while self.players[self.turn].has_folded or self.players[self.turn].cash == 0:
+            self.turn = (self.turn + 1) % self.n_players
 
     def get_ai_response(self):
         player = self.players[self.turn]
