@@ -30,7 +30,7 @@ class TexasHoldemGUI(Frame):
         self.table_card_canvases = []
         self.fold_button = self.call_check_button = self.bet_button = self.bet_entry = self.pot_text = None
         self.show_predicted = self.show_actual = self.game_text = self.game_text_list = self.game = None
-        self.multiplayer = None
+        self.n_human = None
 
     def start_game(self, n_players=5, cash=500, small_blind=1, big_blind=5,
                    show_predicted=True, show_actual=True, ai_names=None,
@@ -47,7 +47,7 @@ class TexasHoldemGUI(Frame):
                                   name=name, cash=cash))
         for i in range(n_human):
             players.append(Player(ai=False, name=names[i], cash=cash))
-        self.multiplayer = n_human > 1
+        self.n_human = n_human
         for i in range(len(players), n_players):
             players.append(
                 Player(ai=importlib.import_module('DefaultTexasHoldemAI').TexasHoldemAI(names[-i], cash, names),
@@ -117,8 +117,8 @@ class TexasHoldemGUI(Frame):
         self.root.update()
 
     def update_turn(self):
-        if self.multiplayer and self.game.current_human is not None and self.game.current_human == self.game.turn and \
-                not self.game.players[self.game.turn].ai:
+        player = self.game.players[self.game.turn]
+        if self.n_human > 1 and self.game.current_human == self.game.turn:
             name = self.game.players[self.game.turn].name
             this_game_text = [self.game_text_list[-1]]
             i = 2
@@ -126,10 +126,10 @@ class TexasHoldemGUI(Frame):
                 this_game_text.append(self.game_text_list[-i])
                 i += 1
             messagebox.showinfo('%s\'s turn' % name, '\n'.join(this_game_text[::-1]))
-            player = self.game.players[self.game.turn]
             self.draw_deal(player, up=True)
-        elif not self.multiplayer:
-            self.update_game_text('%s\'s turn' % self.game.players[self.game.turn].name)
+        elif self.n_human == 1 and self.game.current_human == self.game.turn:
+            self.update_game_text('%s\'s turn' % player.name)
+            self.draw_deal(player, up=True)
         call_amount = self.game.get_bet() - self.game.players[self.game.turn].bet
         call_check_text = 'Call\t%s' % call_amount if call_amount else 'Check'
         self.call_check_button.config(text=call_check_text)
