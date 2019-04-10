@@ -1,7 +1,8 @@
 from tkinter import Tk, Canvas, Frame, Button, Entry, messagebox
 from TexasHoldem import Deck, Player, Game
 import numpy as np
-import importlib, time
+from importlib import import_module
+import time, os
 
 
 class TexasHoldemGUI(Frame):
@@ -38,19 +39,19 @@ class TexasHoldemGUI(Frame):
         self.show_predicted = show_predicted
         self.show_actual = show_actual
         players = []
-        if ai_names is None:
+        if ai_names is None or not ai_names:
             names = np.random.choice(Player.names, n_players, replace=False)
         else:
             names = np.random.choice(Player.names, n_players - len(ai_names), replace=False) + list(ai_names.keys())
         for name in ai_names if ai_names is not None else []:
-            players.append(Player(ai=importlib.import_module(name).TexasHoldemAI(name, cash, names),
+            players.append(Player(ai=import_module('AI.%s' % name).TexasHoldemAI(name, cash, names),
                                   name=name, cash=cash))
         for i in range(n_human):
             players.append(Player(ai=False, name=names[i], cash=cash))
         self.n_human = n_human
         for i in range(len(players), n_players):
             players.append(
-                Player(ai=importlib.import_module('DefaultTexasHoldemAI').TexasHoldemAI(names[-i], cash, names),
+                Player(ai=import_module('AI.DefaultTexasHoldemAI').TexasHoldemAI(names[-i], cash, names),
                        name=names[-i], cash=cash))
         self.game = Game(players, small_blind=small_blind, big_blind=big_blind,  gui=self)
         x0, y0, dy = (self.width-self.width/(int(n_players/2)+1))/self.width, 2./3, 1./9
@@ -169,7 +170,8 @@ class TexasHoldemGUI(Frame):
         player.dealer_icon = None
         player.dealer_text = None
         player.canvas.create_text(player.x_center, player.height / 12, text=player.name, fill='white', font=player.font)
-        self.draw_deal(player, up=up)
+        if player.deal is not None:
+            self.draw_deal(player, up=up)
         self.updatables(player)
 
     def draw_winner(self, player):
@@ -239,6 +241,7 @@ class TexasHoldemGUI(Frame):
             self.draw_card(card, self.table_card_canvases[i], 0, self.card_size[0], self.card_size[1], 0)
         self.player_up()
         self.root.update()
+        time.sleep(0.5)
 
     def get_bet(self):
         try:
@@ -292,7 +295,9 @@ def draw_suit(suit, canvas, x0, x1, y0, y1, tag, coords):
 
 
 if __name__ == '__main__':
+    fnames = {f.split('.')[0]:f for f in os.listdir('AI') if
+              '.' in f and f.split('.')[1] == 'py' and not f == 'DefaultTexasHoldemAI.py'}
     root = Tk()
     self = TexasHoldemGUI(root)
-    self.start_game()
+    self.start_game(ai_names=fnames, n_players=max([5, len(fnames) + 1]))
     root.mainloop()

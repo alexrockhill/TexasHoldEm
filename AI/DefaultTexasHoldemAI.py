@@ -40,7 +40,7 @@ class TexasHoldemAI:
         this_bet = max(self.current_bets.values()) if self.current_bets else 0
         big_stack = (self.cashes[self.name] >
                      max([cash for player, cash in self.cashes.items() if player != self.name]) * 2)
-        go_for_it = w > (self.check_threshold + this_bet/self.cashes[self.name]/10)
+        go_for_it = w > (self.check_threshold + this_bet/max([1, self.cashes[self.name]]))
         if go_for_it or self.bluffing or big_stack:
             if self.big_bet:
                 amount = int(max([this_bet, cash / np.random.randint(2, 7)]))

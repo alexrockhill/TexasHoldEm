@@ -193,7 +193,7 @@ class Hand:
         elif two_pair:
             return 'Two pair {}s and {}s'.format(*self.number_to_name(two_pair))
         elif pair:
-            return 'Pair %s' % self.number_to_name(pair)
+            return 'Pair of %ss' % self.number_to_name(pair)
         else:
             return 'High card %s' % self.number_to_name(max(self.numbers))
 
@@ -263,7 +263,7 @@ class Player:
              'Fabio', 'Rick', 'Bradley', 'Sasquatch']
 
     def __init__(self, name=None, cash=500, ai=None):
-        self.name = name if name is None else name
+        self.name = np.random.choice(self.names) if name is None else name
         self.ai = ai
         self.cash = cash
         self.has_folded = False
@@ -311,6 +311,8 @@ class Game:
         for player in self.players:
             if player.cash > 0:
                 player.set_deal(self.deck.random_cards(2))
+            else:
+                player.set_deal(None)
             if player.ai:
                 player.ai.new_game(player.deal)
         self.set_current_human()
@@ -323,9 +325,9 @@ class Game:
 
     def blinds(self):
         self.next_player()
-        self.pot += self.players[self.turn].make_bet(self.small_blind)
+        self.pot += self.players[self.turn].make_bet(min([self.players[self.turn].cash, self.small_blind]))
         self.next_player()
-        self.pot += self.players[self.turn].make_bet(self.big_blind)
+        self.pot += self.players[self.turn].make_bet(min([self.players[self.turn].cash, self.big_blind]))
         self.raise_player = self.turn
         self.next_player()
         self.send_to_gui('update_turn')
@@ -340,7 +342,14 @@ class Game:
                 self.current_human = (self.current_human + 1) % self.n_players
 
     def send_to_gui(self, func, *args):
-        if self.gui is not None:
+        if self.gui is None:
+            if func == 'update_game_text' or func == 'hand_over':
+                print(args[0])
+                if func == 'hand_over':
+                    print(', '.join(['%s: %s' % (player.name, player.cash) for player in self.players]))
+            elif func == 'draw_winner':
+                print('%s wins!' % args[0].name)
+        else:
             getattr(self.gui, func)(*args)
 
     def get_bet(self):
@@ -359,8 +368,9 @@ class Game:
 
     def checkcall(self):
         amount = self.get_bet() - self.players[self.turn].bet
-        self.send_to_gui('update_game_text', '%s %s' % (self.players[self.turn].name,
-                                                        'calls' if amount > 0 else 'checks'))
+        if amount < self.players[self.turn].cash:
+            self.send_to_gui('update_game_text', '%s %s' % (self.players[self.turn].name,
+                                                            'calls' if amount > 0 else 'checks'))
         self.make_bet(amount)
 
     def make_bet(self, amount=None):
@@ -370,12 +380,13 @@ class Game:
         if amount > player.cash:
             amount = player.cash
         if amount + player.bet > self.get_bet() or amount == player.cash:
-            if amount > 0:
+            if amount + player.bet > self.get_bet():
                 self.raise_player = self.turn
-            if amount == player.cash:
-                self.send_to_gui('update_game_text', '%s all in %i' % (player.name, amount))
-            else:
-                self.send_to_gui('update_game_text', '%s raises %i' % (player.name, amount))
+            if amount > 0:
+                if amount == player.cash:
+                    self.send_to_gui('update_game_text', '%s all in %i' % (player.name, amount))
+                else:
+                    self.send_to_gui('update_game_text', '%s raises %i' % (player.name, amount))
         elif amount + player.bet < self.get_bet():
             if player.ai:
                 self.send_to_gui('update_game_text', '%s ai failed; bet too low, folding' % player.name)
@@ -390,23 +401,25 @@ class Game:
         self.increment_turn()
 
     def increment_turn(self):
-        player = self.players[self.turn]
-        if self.raise_player is None and not player.has_folded and player.cash > 0:
+        if self.raise_player is None and not self.players[self.turn].has_folded:
             self.raise_player = self.turn
         self.next_player()
         winner = self.check_all_fold()
         if winner is None:
             if self.check_all_call():
                 self.next_table_cards()
-            self.send_to_gui('update_turn')
-            if self.players[self.turn].ai:
-                self.get_ai_response()
+            if sum([player.cash > 0 for player in self.players]) > 1:  # don't continue if game over
+                self.send_to_gui('update_turn')
+                if self.players[self.turn].cash == 0:  # all in
+                    self.checkcall()
+                if self.players[self.turn].ai:
+                    self.get_ai_response()
         else:
             self.hand_over(winner)
 
     def next_player(self):
         self.turn = (self.turn + 1) % self.n_players
-        while self.players[self.turn].has_folded or self.players[self.turn].cash == 0:
+        while self.players[self.turn].has_folded or self.players[self.turn].deal is None:
             self.turn = (self.turn + 1) % self.n_players
 
     def get_ai_response(self):
@@ -417,19 +430,22 @@ class Game:
         elif response in ['check', 'call']:
             self.checkcall()
         elif len(response) == 2 and response[0] == 'bet':
-            self.make_bet(response[1])
+            if response[1] > 0:
+                self.make_bet(response[1])
+            else:
+                self.checkcall()
         else:
             print('unrecognized response %s, folding' % response)
             self.fold()
 
     def update_percentages(self):
         for player in self.players:
-            if not player.has_folded:
+            if not player.has_folded and player.deal is not None:
                 if player.ai or (self.gui is not None and self.gui.show_predicted):
                     player.predicted = self.deck.score_holdem(player.deal, self.table_cards,
                                                               n_other_players=self.n_players-1)
                 if not player.ai and self.gui is not None and self.gui.show_actual:
-                    other_deals = [p.deal for p in self.players if p is not player]
+                    other_deals = [p.deal for p in self.players if p is not player and p.deal is not None]
                     player.actual = self.deck.score_holdem(player.deal, self.table_cards, other_deals=other_deals)
 
     def hand_over(self, winner=None):
@@ -438,35 +454,36 @@ class Game:
             winner_text = '%s %s' % (winning_hand.get_text(), winner.name)
         else:
             winner_text = 'Everyone else folded, %s wins' % winner.name
+        winner.cash += self.pot
         self.send_to_gui('hand_over', winner_text)
         self.dealer = (self.dealer + 1) % self.n_players
         while not self.players[self.dealer].cash:
             self.dealer = (self.dealer + 1) % self.n_players
-        winner.cash += self.pot
         info = {'winner': {winner.name: winner.deal},
                 'losers': {player.name: player.deal for player in self.players if player is not winner},
                 'pot': self.pot, 'folded': [player for player in self.players if player.has_folded]}
         for player in self.players:
             if player.ai:
                 player.ai.update_result(info)
-        if sum([player.cash > 0 for player in self.players]):
+        if sum([player.cash > 0 for player in self.players]) > 1:
             self.new_game()
         else:
-            self.send_to_gui('draw_winner')
+            self.send_to_gui('draw_winner', winner)
 
     def check_all_call(self):
         current_bet = self.get_bet()
-        return (all([player.bet == current_bet for player in self.players if not player.has_folded]) and
+        return (all([player.bet == current_bet or player.cash == 0
+                     for player in self.players if not player.has_folded and player.deal is not None]) and
                 self.turn == self.raise_player)
 
     def check_all_fold(self):
-        players_in = [player for player in self.players if not player.has_folded and player.cash > 0]
+        players_in = [player for player in self.players if not player.has_folded and player.deal is not None]
         if len(players_in) == 1:
             return players_in[0]
         return None
 
     def get_winner(self):
-        players_in = [player for player in self.players if not player.has_folded and player.cash > 0]
+        players_in = [player for player in self.players if player.deal is not None]
         hands_in = {player: self.deck.get_best_hand(player.deal + self.table_cards) for player in players_in}
         winner = max(hands_in, key=hands_in.get)
         return winner, hands_in[winner]
@@ -479,7 +496,7 @@ class Game:
             self.table_cards += new_cards
         elif len(self.table_cards) < 5:
             new_cards = self.deck.random_cards(n=1)
-            self.send_to_gui('update_game_text', 'The %s is %s' % ('turn' if len(self.table_cards) == 4 else 'river',
+            self.send_to_gui('update_game_text', 'The %s is %s' % ('turn' if len(self.table_cards) == 3 else 'river',
                                                                    ', '.join([c.__repr__() for c in new_cards])))
             self.table_cards += new_cards
         else:
