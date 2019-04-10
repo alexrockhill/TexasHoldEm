@@ -368,7 +368,7 @@ class Game:
 
     def checkcall(self):
         amount = self.get_bet() - self.players[self.turn].bet
-        if amount < self.players[self.turn].cash:
+        if amount < self.players[self.turn].cash or amount == 0:
             self.send_to_gui('update_game_text', '%s %s' % (self.players[self.turn].name,
                                                             'calls' if amount > 0 else 'checks'))
         self.make_bet(amount)
@@ -407,15 +407,22 @@ class Game:
         winner = self.check_all_fold()
         if winner is None:
             if self.check_all_call():
-                self.next_table_cards()
-            if sum([player.cash > 0 for player in self.players]) > 1:  # don't continue if game over
-                self.send_to_gui('update_turn')
-                if self.players[self.turn].cash == 0:  # all in
-                    self.checkcall()
-                if self.players[self.turn].ai:
-                    self.get_ai_response()
+                if len(self.table_cards) == Deck.hand_n:
+                    self.hand_over()
+                else:
+                    self.next_table_cards()
+                    self.next_turn()
+            else:
+                self.next_turn()
         else:
             self.hand_over(winner)
+
+    def next_turn(self):
+        self.send_to_gui('update_turn')
+        if self.players[self.turn].cash == 0:  # all in
+            self.checkcall()
+        if self.players[self.turn].ai:
+            self.get_ai_response()
 
     def next_player(self):
         self.turn = (self.turn + 1) % self.n_players
@@ -499,9 +506,6 @@ class Game:
             self.send_to_gui('update_game_text', 'The %s is %s' % ('turn' if len(self.table_cards) == 3 else 'river',
                                                                    ', '.join([c.__repr__() for c in new_cards])))
             self.table_cards += new_cards
-        else:
-            self.hand_over()
-            return
         self.update_percentages()
         for player in self.players:
             player.zero_bet()
