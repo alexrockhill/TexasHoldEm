@@ -421,7 +421,7 @@ class Game:
         self.send_to_gui('update_turn')
         if self.players[self.turn].cash == 0:  # all in
             self.checkcall()
-        if self.players[self.turn].ai:
+        elif self.players[self.turn].ai:
             self.get_ai_response()
 
     def next_player(self):
